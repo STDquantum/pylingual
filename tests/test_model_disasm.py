@@ -1,7 +1,7 @@
 import pytest
 
 from pylingual.masking.global_masker import Masker
-from pylingual.masking.model_disasm import restore_masked_source_text
+from pylingual.masking.model_disasm import restore_masked_source, restore_masked_source_text
 
 
 @pytest.mark.parametrize("mask", ["<mask_0>", "'<mask_0>'", '"<mask_0>"'])
@@ -105,3 +105,15 @@ def test_string_mask_in_fstring_literal_doubles_braces():
     source = "value = f'<mask_0>{<mask_2>}<mask_1>' + '<mask_0>'"
 
     assert restore_masked_source_text([source], masker) == ["value = f'{{{var}}}' + '{'"]
+
+
+@pytest.mark.parametrize("text", ["", "value = <mask_0>", "value = <mask_0>\n", "value = <mask_0>\n\nother = <mask_0>"])
+def test_restore_masked_source_file_wrapper(tmp_path, text):
+    masker = Masker()
+    masker.global_tab["secret"] = "<mask_0>"
+    masked_file = tmp_path / "masked.py"
+    masked_file.write_text(text)
+
+    restored = restore_masked_source(masked_file, masker, (3, 13))
+    assert restored == "\n".join(restore_masked_source_text(text.splitlines(), masker))
+    assert isinstance(restored, str)
